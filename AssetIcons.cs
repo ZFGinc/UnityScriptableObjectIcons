@@ -1,18 +1,15 @@
-﻿using System.Collections;
-using System.Collections.Generic;
+﻿using System;
 using System.Linq;
-using UnityEngine;
 using UnityEditor;
-using System;
+using UnityEngine;
 
 [AttributeUsage(AttributeTargets.Field)]
-public class ScriptableObjectIcon : Attribute
-{
-}
+public class ScriptableObjectIcon : Attribute { }
 
 [ExecuteInEditMode]
 [InitializeOnLoad]
-public class AssetIcons : Editor {
+public class AssetIcons : Editor
+{
 
     static bool unityDeafaultOnNull;
     static bool UnityDeafaultOnNull
@@ -30,7 +27,8 @@ public class AssetIcons : Editor {
     }
 
     static bool disableIcons;
-    static bool DisableIcons {
+    static bool DisableIcons
+    {
         get
         {
             return disableIcons;
@@ -42,7 +40,7 @@ public class AssetIcons : Editor {
         }
     }
 
-    public static Color backgroundColor = new Color(82f / 255f,82f / 255f, 82f / 255f, 1f);
+    public static Color backgroundColor = new Color(82f / 255f, 82f / 255f, 82f / 255f, 1f);
     static Texture2D bg;
 
     private const string MENU_NAME_DISABLE_ICONS = "Assets/Icons/Disable";
@@ -66,7 +64,8 @@ public class AssetIcons : Editor {
         disableIcons = EditorPrefs.GetBool(MENU_NAME_DISABLE_ICONS, false);
         unityDeafaultOnNull = EditorPrefs.GetBool(MENU_NAME_DefOnNull, false);
 
-        EditorApplication.delayCall += () => {
+        EditorApplication.delayCall += () =>
+        {
             SetStateDisabled(disableIcons);
             UnityDeafaultOnNull = unityDeafaultOnNull;
         };
@@ -93,6 +92,52 @@ public class AssetIcons : Editor {
         return myCallback;
     }
 
+    static Texture2D GetSlicedSpriteTexture(Sprite sprite)
+    {
+        if (CheckSpriteMode(sprite) != SpriteImportMode.Multiple)
+        {
+            return sprite.texture;
+        }
+
+        Rect rect = sprite.rect;
+        Texture2D slicedTex = new Texture2D((int)rect.width, (int)rect.height);
+        slicedTex.filterMode = sprite.texture.filterMode;
+
+        slicedTex.SetPixels(0, 0, (int)rect.width, (int)rect.height, sprite.texture.GetPixels((int)rect.x, (int)rect.y, (int)rect.width, (int)rect.height));
+        slicedTex.Apply();
+
+        return slicedTex;
+    }
+
+    static SpriteImportMode CheckSpriteMode(Sprite sprite)
+    {
+        if (sprite == null)
+        {
+            Debug.LogError("Sprite is null!");
+            return SpriteImportMode.None;
+        }
+
+        // Получаем путь к текстуре спрайта
+        string assetPath = AssetDatabase.GetAssetPath(sprite.texture);
+
+        if (string.IsNullOrEmpty(assetPath))
+        {
+            Debug.LogError("Не удалось получить путь к текстуре спрайта.");
+            return SpriteImportMode.None;
+        }
+
+        // Получаем импортер текстуры
+        TextureImporter textureImporter = AssetImporter.GetAtPath(assetPath) as TextureImporter;
+
+        if (textureImporter == null)
+        {
+            Debug.LogError("Не удалось получить импортер текстуры.");
+            return SpriteImportMode.None;
+        }
+
+        return textureImporter.spriteImportMode;
+    }
+
     static void IconGUI(string s, Rect r)
     {
         var guid = AssetDatabase.GUIDToAssetPath(s);
@@ -104,12 +149,12 @@ public class AssetIcons : Editor {
 
         var t = AssetDatabase.LoadAssetAtPath(guid, typeof(object)) as object;
         if (t == null || t.GetType() == null) return;
-        
+
         Texture2D texture = null;
-        
+
         var atts = t.GetType().GetFields().Where(fi => ((fi == null) ? 0 : fi.GetCustomAttributes(typeof(ScriptableObjectIcon), false).Count()) > 0);
 
-        if (atts != null && atts.Count() == 1 )
+        if (atts != null && atts.Count() == 1)
         {
             object obj = atts.First().GetValue(t);
             if (obj == null)
@@ -120,7 +165,7 @@ public class AssetIcons : Editor {
                 Sprite sprite = (Sprite)obj;
                 if (sprite != null)
                 {
-                    texture = sprite.texture;
+                    texture = GetSlicedSpriteTexture(sprite);
                 }
             }
 
@@ -137,15 +182,16 @@ public class AssetIcons : Editor {
 
         Rect r2 = new Rect(r);
         r2.height -= 14;
-        GUI.DrawTexture(r2, bg, ScaleMode.StretchToFill, false);
-        GUI.DrawTexture(r2, bg, ScaleMode.StretchToFill, true, 0, backgroundColor, 2, 3);
-        
+        r2.width = r2.height;
         r.yMin += 5;
         r.height -= 22;
-        
 
-        if(texture != null)
+        if (texture != null && r2.height >= 14)
+        {
+            GUI.DrawTexture(r2, bg, ScaleMode.ScaleToFit, false);
+            GUI.DrawTexture(r2, bg, ScaleMode.ScaleToFit, true, 0, backgroundColor, 2, 3);
+
             GUI.DrawTexture(r, texture, ScaleMode.ScaleToFit);
-
+        }
     }
 }
